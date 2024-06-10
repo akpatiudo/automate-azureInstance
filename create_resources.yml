@@ -1,0 +1,93 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars:
+    resource_group: myResourceGroup
+    location: swedencentral
+    vnet_name: myVnet
+    subnet_name: mySubnet
+    nsg_name: myNsg
+    vm_name: myVm
+    vm_size: Standard_DS1_v2
+    admin_username: azureuser
+    admin_password: SecureP@ssw0rd!
+    storage_account_name: mystorageacct
+    storage_account_kind: StorageV2
+    storage_account_sku: Standard_LRS
+
+  tasks:
+    - name: Creating resource group
+      azure_rm_resourcegroup:
+        name: "{{ resource_group }}"
+        location: "{{ location }}"
+
+    - name: Creating virtual network
+      azure_rm_virtualnetwork:
+        resource_group: "{{ resource_group }}"
+        name: "{{ vnet_name }}"
+        address_prefixes: "10.0.0.0/16"
+        location: "{{ location }}"
+
+    - name: Creating subnet
+      azure_rm_subnet:
+        resource_group: "{{ resource_group }}"
+        name: "{{ subnet_name }}"
+        address_prefix: "10.0.1.0/24"
+        virtual_network: "{{ vnet_name }}"
+
+    - name: Creating network security group
+      azure_rm_networksecuritygroup:
+        resource_group: "{{ resource_group }}"
+        name: "{{ nsg_name }}"
+        location: "{{ location }}"
+        security_rules:
+          - name: AllowSSH
+            protocol: Tcp
+            direction: Inbound
+            priority: 1000
+            source_address_prefix: '*'
+            destination_address_prefix: '*'
+            access: Allow
+            destination_port_range: 22
+            source_port_range: '*'
+
+    - name: Creating network interface
+      azure_rm_networkinterface:
+        resource_group: "{{ resource_group }}"
+        name: "{{ vm_name }}NIC"
+        location: "{{ location }}"
+        subnet_name: "{{ subnet_name }}"
+        virtual_network_name: "{{ vnet_name }}"
+        security_group: "{{ nsg_name }}"
+
+    - name: Creating virtual machine
+      azure_rm_virtualmachine:
+        resource_group: "{{ resource_group }}"
+        name: "{{ vm_name }}"
+        vm_size: "{{ vm_size }}"
+        admin_username: "{{ admin_username }}"
+        admin_password: "{{ admin_password }}"
+        network_interfaces: "{{ vm_name }}NIC"
+        image:
+          offer: UbuntuServer
+          publisher: Canonical
+          sku: 18.04-LTS
+          version: latest
+        location: "{{ location }}"
+        os_disk:
+          name: myOsDisk
+          caching: ReadWrite
+          create_option: FromImage
+          managed_disk:
+            storage_account_type: Standard_LRS
+
+    - name: Creating storage account
+      azure_rm_storageaccount:
+        resource_group: "{{ resource_group }}"
+        name: "{{ storage_account_name }}"
+        account_type: "{{ storage_account_kind }}"
+        account_kind: "{{ storage_account_kind }}"
+        account_sku: "{{ storage_account_sku }}"
+        location: "{{ location }}"
